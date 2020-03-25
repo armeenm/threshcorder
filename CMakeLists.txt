@@ -60,5 +60,6 @@ if(${STATIC_ANALYSIS})
 endif()
 
 target_link_libraries(threshcorder PRIVATE
+  asound
   ubsan
   spdlog::spdlog)

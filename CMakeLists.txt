@@ -43,7 +43,7 @@ add_executable(threshcorder ${SRCS})
 target_include_directories(threshcorder PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_compile_options(threshcorder PRIVATE ${BUILD_OPTS})
-target_compile_features(threshcorder PUBLIC cxx_std_20)
+target_compile_features(threshcorder PUBLIC cxx_std_17)
 
 if(${FORCE_COLORED_OUTPUT})
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")

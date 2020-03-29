@@ -1,19 +1,26 @@
 #include "threshcorder/util.h"
 
 #include <chrono>
+#include <csignal>
 #include <iostream>
 
 using namespace std::literals;
 
+volatile std::sig_atomic_t sigint_status;
+
+auto sig_handler(int signal) -> void { sigint_status = signal; }
+
 auto main(int const argc, char const* const* const argv) -> int {
+  auto constexpr format = SND_PCM_FORMAT_S16_LE;
+  auto constexpr rate = 44100u;
+  auto constexpr buf_size = rate / 8;
+
   if (argc != 2) {
     fmt::print(stderr, "Must have 2 args\n");
     return -1;
   }
 
-  auto constexpr format = SND_PCM_FORMAT_S16_LE;
-  auto constexpr rate = 44100u;
-  auto constexpr buf_size = rate / 8;
+  std::signal(SIGINT, sig_handler);
 
   auto& dev_name = argv[1];
 
@@ -23,7 +30,7 @@ auto main(int const argc, char const* const* const argv) -> int {
     return -1;
   }
 
-  while (true) {
+  while (!sigint_status) {
     auto const start = std::chrono::high_resolution_clock::now();
 
     auto const [data, count] = listen<buf_size>(handle).value();
@@ -40,6 +47,8 @@ auto main(int const argc, char const* const* const argv) -> int {
 
     std::cout << '\n';
   }
+
+  fmt::print("\nDone!");
 
   snd_pcm_close(handle);
 }

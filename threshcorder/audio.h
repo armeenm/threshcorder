@@ -74,8 +74,7 @@ auto listen(snd_pcm_t* const handle)
 
   long int err;
   if ((err = snd_pcm_readi(handle, buf.data(), frames)) != frames) {
-    fmt::print(stderr, "Read from audio interface failed ({})\n",
-               snd_strerror(static_cast<int>(err)));
+    fmt::print(stderr, "Read from audio interface failed ({})\n", snd_strerror(int(err)));
     return std::nullopt;
   }
 
@@ -99,9 +98,9 @@ template <typename It> auto rms(It&& begin, It&& end) -> float {
 
   auto const square =
       std::accumulate(std::forward<It>(begin), std::forward<It>(end), value_type{0}, square_add);
-  auto const mean_square = static_cast<float>(square) / static_cast<float>(count);
+  auto const mean_square = float(square) / float(count);
 
-  fmt::print("Square: {}, Mean Square: {}; ", square, mean_square);
+  // fmt::print("Square: {}, Mean Square: {}; ", square, mean_square);
 
   return std::sqrt(std::abs(mean_square));
 }

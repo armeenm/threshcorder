@@ -52,7 +52,7 @@ WavFile::WavFile(std::filesystem::path path, Info info)
   write_elem_(&block_align);
 
   // BitsPerSample
-  auto const bits_per_sample = std::uint16_t(sample_size_ / 8);
+  auto const bits_per_sample = std::uint16_t(sample_size_ * 8);
   write_elem_(&bits_per_sample);
 
   // Subchunk2ID

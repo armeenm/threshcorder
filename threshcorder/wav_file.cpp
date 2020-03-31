@@ -16,59 +16,76 @@ WavFile::WavFile(std::filesystem::path path, Info info)
 
   // ChunkID
   auto const chunk_id_p = to_uint32_p("RIFF");
-  std::fwrite(chunk_id_p, sizeof(*chunk_id_p), 1, fd_);
+  write_elem_(chunk_id_p);
 
-  // ChunkSize
+  // Skip ChunkSize
   // Should be updated after each append
-  auto const chunk_size = std::uint32_t{36};
-  std::fwrite(&chunk_size, sizeof(chunk_size), 1, fd_);
+  std::fseek(fd_, 4, SEEK_CUR);
 
   // Format
   auto const format_p = to_uint32_p("WAVE");
-  std::fwrite(format_p, sizeof(*format_p), 1, fd_);
+  write_elem_(format_p);
 
   // Subchunk1ID
   auto const subchunk1_id_p = to_uint32_p("fmt ");
-  std::fwrite(subchunk1_id_p, sizeof(*subchunk1_id_p), 1, fd_);
+  write_elem_(subchunk1_id_p);
 
   // Subchunk1Size
   auto constexpr subchunk1_size = std::uint32_t{16};
-  std::fwrite(&subchunk1_size, sizeof(subchunk1_size), 1, fd_);
+  write_elem_(&subchunk1_size);
 
   // AudioFormat
   auto constexpr audio_format = std::uint16_t{1};
-  std::fwrite(&audio_format, sizeof(audio_format), 1, fd_);
+  write_elem_(&audio_format);
 
   // NumChannels
-  std::fwrite(&info_.channels, sizeof(info_.channels), 1, fd_);
+  write_elem_(&info_.channels);
 
   // SampleRate
-  std::fwrite(&info_.rate, sizeof(info_.rate), 1, fd_);
+  write_elem_(&info_.rate);
 
-  // ByteRate, BlockAlign, BitsPerSample
-  auto const bits_per_sample = static_cast<std::uint16_t>(snd_pcm_format_width(info_.format));
-  auto const block_align = static_cast<std::uint16_t>(info_.channels * bits_per_sample / 8);
-  auto const byte_rate = info_.rate * block_align;
+  // ByteRate, BlockAlign
+  auto const block_align = std::uint32_t(info_.channels * sample_size_);
+  auto const byte_rate = std::uint16_t(info_.rate * block_align);
 
-  std::fwrite(&byte_rate, sizeof(byte_rate), 1, fd_);
-  std::fwrite(&block_align, sizeof(block_align), 1, fd_);
-  std::fwrite(&bits_per_sample, sizeof(bits_per_sample), 1, fd_);
+  write_elem_(&byte_rate);
+  write_elem_(&block_align);
+
+  // BitsPerSample
+  auto const bits_per_sample = std::uint16_t(sample_size_ / 8);
+  write_elem_(&bits_per_sample);
 
   // Subchunk2ID
   auto const subchunk2_id_p = to_uint32_p("data");
-  std::fwrite(subchunk2_id_p, sizeof(*subchunk2_id_p), 1, fd_);
+  write_elem_(subchunk2_id_p);
 
   // Subchunk2Size
   // Should be updated after each append
-  auto constexpr subchunk2_size = std::uint32_t{0};
-  std::fwrite(&subchunk2_size, sizeof(subchunk2_size), 1, fd_);
+  std::fseek(fd_, 4, SEEK_CUR);
 }
 
-WavFile::~WavFile() { std::fclose(fd_); }
+WavFile::~WavFile() {
+  // ChunkSize
+  std::fseek(fd_, 4, SEEK_SET);
+  auto const chunk_size = 36 + subchunk2_size_;
+  write_elem_(&chunk_size);
+
+  // Subchunk2Size
+  std::fseek(fd_, 40, SEEK_SET);
+  write_elem_(&subchunk2_size_);
+
+  std::fclose(fd_);
+}
 
 auto WavFile::path() const noexcept -> std::filesystem::path { return path_; }
 auto WavFile::info() const noexcept -> WavFile::Info { return info_; }
 
-auto WavFile::append(const void* data, std::size_t const size) -> std::size_t {
-  return std::fwrite(data, size, 1, fd_);
+auto WavFile::append(const void* const data, std::size_t const count) -> bool {
+  auto const written = std::fwrite(data, sample_size_, count, fd_);
+  if (written != count)
+    return false;
+
+  subchunk2_size_ += std::uint32_t(count * info_.channels * sample_size_);
+
+  return true;
 }

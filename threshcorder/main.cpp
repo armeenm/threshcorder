@@ -78,6 +78,9 @@ auto main(int const argc, char const* const* const argv) -> int {
     */
 
   auto x = WavFile("temp.wav", wav_info);
+  auto y = std::array<std::int16_t, 3>{1, 2, 3};
+
+  x.append(y.data(), y.size());
 
   fmt::print("\nDone!");
 

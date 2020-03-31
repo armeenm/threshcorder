@@ -4,19 +4,21 @@
 #include <chrono>
 #include <csignal>
 #include <filesystem>
+#include <fmt/chrono.h>
+#include <fmt/core.h>
 #include <iostream>
 #include <optional>
 #include <utility>
 
 using namespace std::literals;
-using Event = std::pair<std::chrono::system_clock::time_point, WavFile>;
+using Event = std::pair<std::chrono::high_resolution_clock::time_point, WavFile>;
 
 volatile std::sig_atomic_t sigint_status;
 
 auto sig_handler(int signal) -> void { sigint_status = signal; }
 
 auto main(int const argc, char const* const* const argv) -> int {
-  auto constexpr wav_info = WavFile::Info{44100u, 1, SND_PCM_FORMAT_S16_LE};
+  auto constexpr wav_info = WavFile::Info{44100u, 1, SND_PCM_FORMAT_S16_LE, true};
   auto constexpr threshold = 1.5f;
   auto constexpr buf_size = wav_info.rate / 4;
 
@@ -36,12 +38,15 @@ auto main(int const argc, char const* const* const argv) -> int {
     return -1;
   }
 
-  if (!std::filesystem::create_directory(dir)) {
+  auto errc = std::error_code{};
+  if (!std::filesystem::create_directories(dir, errc)) {
     fmt::print(stderr, "Failed to create output directory '{}'\n", dir);
     return -1;
   }
 
-  auto iter = [&](std::optional<Event>&& event_opt = std::nullopt) -> std::optional<Event> {
+  auto event_opt = std::optional<Event>{std::nullopt};
+
+  while (!sigint_status) {
     auto const [data, count] = listen<buf_size>(handle).value();
 
     // Untriggered //
@@ -51,36 +56,31 @@ auto main(int const argc, char const* const* const argv) -> int {
       fmt::print("RMS: {}\n", rms_val);
 
       if (rms_val > threshold) {
-        auto const trigger_point = std::chrono::system_clock::now();
-        return std::make_pair(trigger_point, WavFile(fmt::format("temp.wav"), wav_info));
+        auto const trigger_point = std::chrono::high_resolution_clock::now();
+        auto const time = std::time(nullptr);
+        auto const filename =
+            fmt::format("{}/{:%Y-%m-%d_%H-%M-%S}.wav", dir, *std::localtime(&time));
+
+        fmt::print("Triggered!\n");
+
+        event_opt = std::move(std::make_pair(trigger_point, WavFile{filename, wav_info}));
       } else
-        return std::nullopt;
+        event_opt = std::nullopt;
 
     } else {
-      auto& [time, file] = *event_opt;
+
+      auto& [trigger_point, file] = *event_opt;
+
+      fmt::print("Triggered state. Filepath: {}\n", file.path().native());
 
       file.append(data.begin(), count);
 
-      auto const is_elapsed = std::chrono::system_clock::now() > time + 5s;
+      auto const is_elapsed = std::chrono::system_clock::now() > trigger_point + 5s;
 
       if (is_elapsed && (rms(data.begin(), data.begin() + count) <= threshold))
-        return std::nullopt;
-
-      return std::move(event_opt);
+        event_opt = std::nullopt;
     }
-  };
-
-  /*
-  auto event_opt = iter();
-
-  while (!sigint_status)
-    event_opt = iter(std::move(event_opt));
-    */
-
-  auto x = WavFile("temp.wav", wav_info);
-  auto y = std::array<std::int16_t, 3>{1, 2, 3};
-
-  x.append(y.data(), y.size());
+  }
 
   fmt::print("\nDone!");
 

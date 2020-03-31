@@ -31,6 +31,7 @@ set(BUILD_OPTS
   -Wpedantic
   -pipe
   -flto
+  -fsanitize=address
   -fsanitize=undefined)
 
 file(GLOB_RECURSE SRCS
@@ -60,6 +61,7 @@ if(${STATIC_ANALYSIS})
 endif()
 
 target_link_libraries(threshcorder PRIVATE
+  asan
   asound
   ubsan
   fmt::fmt

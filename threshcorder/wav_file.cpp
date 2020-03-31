@@ -1,4 +1,5 @@
 #include "threshcorder/wav_file.h"
+#include <iostream>
 
 WavFile::WavFile(std::filesystem::path path, Info info)
     : path_(std::move(path)), info_(std::move(info)) {
@@ -13,6 +14,8 @@ WavFile::WavFile(std::filesystem::path path, Info info)
   auto const to_uint32_p = [](auto&& ptr) {
     return reinterpret_cast<std::uint32_t const*>(std::forward<decltype(ptr)>(ptr));
   };
+
+  std::cout << "Constructing fd: " << fd_ << '\n';
 
   // ChunkID
   auto const chunk_id_p = to_uint32_p("RIFF");
@@ -64,18 +67,33 @@ WavFile::WavFile(std::filesystem::path path, Info info)
   std::fseek(fd_, 4, SEEK_CUR);
 }
 
-WavFile::~WavFile() {
-  // ChunkSize
-  std::fseek(fd_, 4, SEEK_SET);
-  auto const chunk_size = 36 + subchunk2_size_;
-  write_elem_(&chunk_size);
+WavFile::WavFile(WavFile&& other) noexcept {
+  path_ = std::move(other.path_);
+  info_ = other.info_;
+  sample_size_ = other.sample_size_;
+  fd_ = other.fd_;
+  subchunk2_size_ = other.subchunk2_size_;
 
-  // Subchunk2Size
-  std::fseek(fd_, 40, SEEK_SET);
-  write_elem_(&subchunk2_size_);
-
-  std::fclose(fd_);
+  other.fd_ = nullptr;
 }
+
+auto WavFile::operator=(WavFile&& other) noexcept -> WavFile& {
+  if (this != &other) {
+    cleanup_fd();
+
+    path_ = std::move(other.path_);
+    info_ = other.info_;
+    sample_size_ = other.sample_size_;
+    fd_ = other.fd_;
+    subchunk2_size_ = other.subchunk2_size_;
+
+    other.fd_ = nullptr;
+  }
+
+  return *this;
+}
+
+WavFile::~WavFile() { cleanup_fd(); }
 
 auto WavFile::path() const noexcept -> std::filesystem::path { return path_; }
 auto WavFile::info() const noexcept -> WavFile::Info { return info_; }
@@ -88,4 +106,23 @@ auto WavFile::append(const void* const data, std::size_t const count) -> bool {
   subchunk2_size_ += std::uint32_t(count * info_.channels * sample_size_);
 
   return true;
+}
+
+auto WavFile::cleanup_fd() noexcept -> void {
+  if (fd_) {
+    std::cout << "Destroying fd: " << fd_ << '\n';
+
+    // ChunkSize
+    std::fseek(fd_, 4, SEEK_SET);
+    auto const chunk_size = 36 + subchunk2_size_;
+    std::fwrite(&chunk_size, sizeof(chunk_size), 1, fd_);
+
+    // Subchunk2Size
+    std::fseek(fd_, 40, SEEK_SET);
+    std::fwrite(&subchunk2_size_, sizeof(subchunk2_size_), 1, fd_);
+
+    std::fclose(fd_);
+
+    fd_ = nullptr;
+  }
 }

@@ -62,4 +62,5 @@ endif()
 target_link_libraries(threshcorder PRIVATE
   asound
   ubsan
+  fmt::fmt
   spdlog::spdlog)

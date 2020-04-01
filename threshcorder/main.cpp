@@ -40,7 +40,7 @@ auto main(int const argc, char const* const* const argv) -> int {
 
   auto errc = std::error_code{};
   if (!std::filesystem::create_directories(dir, errc)) {
-    fmt::print(stderr, "Failed to create output directory '{}'\n", dir);
+    fmt::print(stderr, "Failed to create output directory '{}': {}\n", dir, errc.message());
     return -1;
   }
 

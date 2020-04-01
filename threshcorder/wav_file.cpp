@@ -15,8 +15,6 @@ WavFile::WavFile(std::filesystem::path path, Info info)
     return reinterpret_cast<std::uint32_t const*>(std::forward<decltype(ptr)>(ptr));
   };
 
-  std::cout << "Constructing fd: " << fd_ << '\n';
-
   // ChunkID
   auto const chunk_id_p = to_uint32_p("RIFF");
   write_elem_(chunk_id_p);
@@ -110,8 +108,6 @@ auto WavFile::append(const void* const data, std::size_t const count) -> bool {
 
 auto WavFile::cleanup_fd() noexcept -> void {
   if (fd_) {
-    std::cout << "Destroying fd: " << fd_ << '\n';
-
     // ChunkSize
     std::fseek(fd_, 4, SEEK_SET);
     auto const chunk_size = 36 + subchunk2_size_;

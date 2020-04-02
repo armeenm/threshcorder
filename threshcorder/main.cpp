@@ -52,10 +52,10 @@ auto main(int const argc, char const* const* const argv) -> int {
 
   while (!sigint_status) {
     auto const [data, count] = listen<buf_size>(handle).value();
+    auto const max_val = *std::max_element(data.begin(), data.begin() + count);
 
     // Untriggered //
     if (!event_opt) {
-      auto const max_val = *std::max_element(data.begin(), data.begin() + count);
 
       fmt::print("Max: {}\n", max_val);
 
@@ -67,7 +67,7 @@ auto main(int const argc, char const* const* const argv) -> int {
 
         fmt::print("Triggered!\n");
 
-        event_opt = std::move(std::make_pair(trigger_point, WavFile{filename, wav_info}));
+        event_opt = std::make_pair(trigger_point, WavFile{filename, wav_info});
       } else
         event_opt = std::nullopt;
 
@@ -75,15 +75,15 @@ auto main(int const argc, char const* const* const argv) -> int {
 
       auto& [trigger_point, file] = *event_opt;
 
-      auto const max_val = *std::max_element(data.begin(), data.begin() + count);
-
       fmt::print("Triggered state. Filepath: {}, Max val: {}\n", file.path().native(), max_val);
 
       file.append(data.begin(), count);
 
-      auto const is_elapsed = std::chrono::system_clock::now() > trigger_point + 5s;
+      auto const now = std::chrono::system_clock::now();
 
-      if (is_elapsed && max_val <= keepalive)
+      if (max_val > keepalive)
+        event_opt->first = now;
+      else if (now > trigger_point + 5s)
         event_opt = std::nullopt;
     }
   }

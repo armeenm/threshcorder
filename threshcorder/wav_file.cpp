@@ -1,9 +1,9 @@
 #include "threshcorder/wav_file.h"
 #include <iostream>
 
-WavFile::WavFile(std::filesystem::path path, Info info)
+WavFile::WavFile(std::filesystem::path path, Info info, bool overwrite)
     : path_(std::move(path)), info_(std::move(info)) {
-  if (std::filesystem::exists(path_) && !info.overwrite)
+  if (std::filesystem::exists(path_) && !overwrite)
     throw std::runtime_error(
         fmt::format("File {} exists and overwriting is disallowed", path_.native()));
 

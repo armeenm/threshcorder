@@ -92,15 +92,11 @@ template <typename It> auto rms(It&& begin, It&& end) -> float {
     return (a_fat * a_fat) + (b_fat * b_fat);
   };
 
-  auto const count = (end - begin);
-
-  // fmt::print("Count: {}, Size: {}; ", count, sizeof(value_type));
+  auto const count = end - begin;
 
   auto const square =
       std::accumulate(std::forward<It>(begin), std::forward<It>(end), value_type{0}, square_add);
   auto const mean_square = float(square) / float(count);
-
-  // fmt::print("Square: {}, Mean Square: {}; ", square, mean_square);
 
   return std::sqrt(std::abs(mean_square));
 }

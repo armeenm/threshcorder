@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <csignal>
+#include <cstdlib>
 #include <filesystem>
 #include <fmt/chrono.h>
 #include <fmt/core.h>
@@ -18,12 +19,11 @@ volatile std::sig_atomic_t sigint_status;
 auto sig_handler(int signal) -> void { sigint_status = signal; }
 
 auto main(int const argc, char const* const* const argv) -> int {
-  auto constexpr wav_info = WavFile::Info{44100u, 1, SND_PCM_FORMAT_S16_LE, true};
-  auto constexpr threshold = 1.5f;
+  auto constexpr wav_info = WavFile::Info{44100u, 1, SND_PCM_FORMAT_S16_LE};
   auto constexpr buf_size = wav_info.rate / 4;
 
-  if (argc != 3) {
-    fmt::print(stderr, "Must provide audio device name and wav folder\n");
+  if (argc < 4) {
+    fmt::print(stderr, "Must provide audio device name, wav folder, and threshold\n");
     return -1;
   }
 
@@ -31,6 +31,9 @@ auto main(int const argc, char const* const* const argv) -> int {
 
   auto& dev_name = argv[1];
   auto& dir = argv[2];
+  auto threshold = std::stoi(argv[3]);
+
+  fmt::print("Threshold: {}\n", threshold);
 
   auto handle = get_handle(dev_name, wav_info.format, wav_info.rate);
   if (!handle) {
@@ -39,7 +42,7 @@ auto main(int const argc, char const* const* const argv) -> int {
   }
 
   auto errc = std::error_code{};
-  if (!std::filesystem::create_directories(dir, errc)) {
+  if (!std::filesystem::create_directories(dir, errc) && errc) {
     fmt::print(stderr, "Failed to create output directory '{}': {}\n", dir, errc.message());
     return -1;
   }
@@ -51,11 +54,11 @@ auto main(int const argc, char const* const* const argv) -> int {
 
     // Untriggered //
     if (!event_opt) {
-      auto const rms_val = rms(data.begin(), data.begin() + count);
+      auto const max_val = *std::max_element(data.begin(), data.begin() + count);
 
-      fmt::print("RMS: {}\n", rms_val);
+      fmt::print("Max: {}\n", max_val);
 
-      if (rms_val > threshold) {
+      if (max_val > threshold) {
         auto const trigger_point = std::chrono::high_resolution_clock::now();
         auto const time = std::time(nullptr);
         auto const filename =
@@ -71,13 +74,15 @@ auto main(int const argc, char const* const* const argv) -> int {
 
       auto& [trigger_point, file] = *event_opt;
 
-      fmt::print("Triggered state. Filepath: {}\n", file.path().native());
+      auto const max_val = *std::max_element(data.begin(), data.begin() + count);
+
+      fmt::print("Triggered state. Max val: {}, Filepath: {}\n", file.path().native(), max_val);
 
       file.append(data.begin(), count);
 
       auto const is_elapsed = std::chrono::system_clock::now() > trigger_point + 5s;
 
-      if (is_elapsed && (rms(data.begin(), data.begin() + count) <= threshold))
+      if (is_elapsed && max_val <= threshold)
         event_opt = std::nullopt;
     }
   }

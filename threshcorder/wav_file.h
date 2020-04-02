@@ -14,10 +14,9 @@ public:
     std::uint32_t rate;
     std::uint16_t channels;
     snd_pcm_format_t format;
-    bool overwrite = false;
   };
 
-  WavFile(std::filesystem::path path, Info info);
+  WavFile(std::filesystem::path path, Info info, bool overwrite = false);
 
   WavFile(WavFile const&) = delete;
   WavFile(WavFile&&) noexcept;

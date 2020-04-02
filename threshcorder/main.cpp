@@ -77,7 +77,7 @@ auto main(int const argc, char const* const* const argv) -> int {
 
       auto const max_val = *std::max_element(data.begin(), data.begin() + count);
 
-      fmt::print("Triggered state. Max val: {}, Filepath: {}\n", file.path().native(), max_val);
+      fmt::print("Triggered state. Max val: {}, Filepath: {}\n", max_val, file.path().native());
 
       file.append(data.begin(), count);
 

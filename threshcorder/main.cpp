@@ -32,6 +32,7 @@ auto main(int const argc, char const* const* const argv) -> int {
   auto& dev_name = argv[1];
   auto& dir = argv[2];
   auto threshold = std::stoi(argv[3]);
+  auto keepalive = (argc == 5) ? std::stoi(argv[4]) : threshold;
 
   fmt::print("Threshold: {}\n", threshold);
 
@@ -82,7 +83,7 @@ auto main(int const argc, char const* const* const argv) -> int {
 
       auto const is_elapsed = std::chrono::system_clock::now() > trigger_point + 5s;
 
-      if (is_elapsed && max_val <= threshold)
+      if (is_elapsed && max_val <= keepalive)
         event_opt = std::nullopt;
     }
   }

@@ -30,9 +30,7 @@ set(BUILD_OPTS
   -Wconversion
   -Wpedantic
   -pipe
-  -flto
-  -fsanitize=address
-  -fsanitize=undefined)
+  -flto)
 
 file(GLOB_RECURSE SRCS
   LIST_DIRECTORIES false
@@ -61,8 +59,6 @@ if(${STATIC_ANALYSIS})
 endif()
 
 target_link_libraries(threshcorder PRIVATE
-  asan
   asound
-  ubsan
   fmt::fmt
   spdlog::spdlog)

@@ -6,7 +6,12 @@
 #include <cstring>
 #include <filesystem>
 #include <fmt/format.h>
+#include <memory>
 #include <type_traits>
+
+struct FileCloser {
+  auto operator()(std::FILE* fp) const noexcept -> void { std::fclose(fp); }
+};
 
 class WavFile {
 public:
@@ -19,10 +24,10 @@ public:
   WavFile(std::filesystem::path path, Info info, bool overwrite = false);
 
   WavFile(WavFile const&) = delete;
-  WavFile(WavFile&&) noexcept;
+  WavFile(WavFile&&) noexcept = default;
 
   auto operator=(WavFile const&) -> WavFile& = delete;
-  auto operator=(WavFile&&) noexcept -> WavFile&;
+  auto operator=(WavFile&&) noexcept -> WavFile& = default;
 
   ~WavFile();
 
@@ -34,14 +39,12 @@ public:
 private:
   std::filesystem::path path_;
   Info info_;
+  std::unique_ptr<std::FILE, FileCloser> fp_ = nullptr;
   std::uint16_t sample_size_ = std::uint16_t(snd_pcm_format_width(info_.format) / 8);
-  FILE* fd_ = nullptr;
   std::uint32_t subchunk2_size_ = 0;
 
   template <typename T> auto write_elem_(T const* buf) const -> void {
-    if (std::fwrite(buf, sizeof(*buf), 1, fd_) != 1)
+    if (std::fwrite(buf, sizeof(*buf), 1, fp_.get()) != 1)
       throw std::runtime_error("Failed to write element to file");
   }
-
-  auto cleanup_fd() noexcept -> void;
 };

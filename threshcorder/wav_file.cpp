@@ -3,11 +3,14 @@
 
 WavFile::WavFile(std::filesystem::path path, Info info, bool overwrite)
     : path_(std::move(path)), info_(std::move(info)) {
+
   if (std::filesystem::exists(path_) && !overwrite)
     throw std::runtime_error(
         fmt::format("File {} exists and overwriting is disallowed", path_.native()));
 
-  if (!(fd_ = std::fopen(path_.c_str(), "w")))
+  fp_.reset(std::fopen(path_.c_str(), "w"));
+
+  if (!fp_)
     throw std::runtime_error(
         fmt::format("Could not open file {}: {}", path_.native(), std::strerror(errno)));
 
@@ -21,7 +24,7 @@ WavFile::WavFile(std::filesystem::path path, Info info, bool overwrite)
 
   // Skip ChunkSize
   // Should be updated after each append
-  std::fseek(fd_, 4, SEEK_CUR);
+  std::fseek(fp_.get(), 4, SEEK_CUR);
 
   // Format
   auto const format_p = to_uint32_p("WAVE");
@@ -62,63 +65,33 @@ WavFile::WavFile(std::filesystem::path path, Info info, bool overwrite)
 
   // Subchunk2Size
   // Should be updated after each append
-  std::fseek(fd_, 4, SEEK_CUR);
+  std::fseek(fp_.get(), 4, SEEK_CUR);
 }
 
-WavFile::WavFile(WavFile&& other) noexcept {
-  path_ = std::move(other.path_);
-  info_ = other.info_;
-  sample_size_ = other.sample_size_;
-  fd_ = other.fd_;
-  subchunk2_size_ = other.subchunk2_size_;
+WavFile::~WavFile() {
+  if (fp_) {
+    auto fp = fp_.get();
 
-  other.fd_ = nullptr;
-}
+    // ChunkSize
+    std::fseek(fp, 4, SEEK_SET);
+    auto const chunk_size = 36 + subchunk2_size_;
+    std::fwrite(&chunk_size, sizeof(chunk_size), 1, fp);
 
-auto WavFile::operator=(WavFile&& other) noexcept -> WavFile& {
-  if (this != &other) {
-    cleanup_fd();
-
-    path_ = std::move(other.path_);
-    info_ = other.info_;
-    sample_size_ = other.sample_size_;
-    fd_ = other.fd_;
-    subchunk2_size_ = other.subchunk2_size_;
-
-    other.fd_ = nullptr;
+    // Subchunk2Size
+    std::fseek(fp, 40, SEEK_SET);
+    std::fwrite(&subchunk2_size_, sizeof(subchunk2_size_), 1, fp);
   }
-
-  return *this;
 }
-
-WavFile::~WavFile() { cleanup_fd(); }
 
 auto WavFile::path() const noexcept -> std::filesystem::path { return path_; }
 auto WavFile::info() const noexcept -> WavFile::Info { return info_; }
 
 auto WavFile::append(const void* const data, std::size_t const count) -> bool {
-  auto const written = std::fwrite(data, sample_size_, count, fd_);
+  auto const written = std::fwrite(data, sample_size_, count, fp_.get());
   if (written != count)
     return false;
 
   subchunk2_size_ += std::uint32_t(count * info_.channels * sample_size_);
 
   return true;
-}
-
-auto WavFile::cleanup_fd() noexcept -> void {
-  if (fd_) {
-    // ChunkSize
-    std::fseek(fd_, 4, SEEK_SET);
-    auto const chunk_size = 36 + subchunk2_size_;
-    std::fwrite(&chunk_size, sizeof(chunk_size), 1, fd_);
-
-    // Subchunk2Size
-    std::fseek(fd_, 40, SEEK_SET);
-    std::fwrite(&subchunk2_size_, sizeof(subchunk2_size_), 1, fd_);
-
-    std::fclose(fd_);
-
-    fd_ = nullptr;
-  }
 }

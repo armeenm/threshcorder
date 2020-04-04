@@ -6,11 +6,15 @@
 #include <cstring>
 #include <filesystem>
 #include <fmt/format.h>
+#include <iostream>
 #include <memory>
 #include <type_traits>
 
 struct FileCloser {
-  auto operator()(std::FILE* fp) const noexcept -> void { std::fclose(fp); }
+  auto operator()(std::FILE* fp) const noexcept -> void {
+    std::cout << "Closing " << fp << '\n';
+    std::fclose(fp);
+  }
 };
 
 class WavFile {

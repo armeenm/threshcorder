@@ -1,9 +1,11 @@
+#include "third_party/magic_enum.hpp"
 #include "threshcorder/audio.h"
 #include "threshcorder/wav_file.h"
 
 #include <chrono>
 #include <csignal>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fmt/chrono.h>
 #include <fmt/core.h>
@@ -22,73 +24,91 @@ auto main(int const argc, char const* const* const argv) -> int {
   auto constexpr wav_info = WavFile::Info{44100u, 1, SND_PCM_FORMAT_S16_LE};
   auto constexpr buf_size = wav_info.rate / 4;
 
-  if (argc < 4) {
-    fmt::print(stderr, "Must provide audio device name, wav folder, and threshold\n");
-    return -1;
-  }
+  try {
+    if (argc < 4)
+      throw std::runtime_error(
+          "Must provide at least audio device name, wav folder, and threshold");
 
-  std::signal(SIGINT, sig_handler);
+    std::signal(SIGINT, sig_handler);
 
-  auto& dev_name = argv[1];
-  auto& dir = argv[2];
-  auto threshold = std::stoi(argv[3]);
-  auto keepalive = (argc == 5) ? std::stoi(argv[4]) : threshold;
+    auto dev_name = argv[1];
+    auto dir = argv[2];
+    auto threshold_str = argv[3];
+    auto keepalive_str = argv[4];
+    auto detection_method_str = argv[5];
 
-  fmt::print("Threshold: {}\n", threshold);
+    auto const threshold = std::strtof(threshold_str, nullptr);
+    auto const keepalive = (argc >= 5) ? std::strtof(keepalive_str, nullptr) : threshold;
 
-  auto handle = get_handle(dev_name, wav_info.format, wav_info.rate);
-  if (!handle) {
-    fmt::print(stderr, "Failed to open and configure device '{}'\n", dev_name);
-    return -1;
-  }
+    auto const detection_method_opt =
+        (argc >= 6) ? magic_enum::enum_cast<DetectionMethod>(detection_method_str)
+                    : DetectionMethod::RMS;
 
-  auto errc = std::error_code{};
-  if (!std::filesystem::create_directories(dir, errc) && errc) {
-    fmt::print(stderr, "Failed to create output directory '{}': {}\n", dir, errc.message());
-    return -1;
-  }
+    if (!detection_method_opt)
+      throw std::runtime_error(fmt::format("Unknown detection method '{}'", detection_method_str));
 
-  auto event_opt = std::optional<Event>{std::nullopt};
+    auto const detection_method = detection_method_opt.value();
 
-  while (!sigint_status) {
-    auto const [data, count] = listen<buf_size>(handle).value();
-    auto const max_val = *std::max_element(data.begin(), data.begin() + count);
+    fmt::print("Threshold: {}\n", threshold);
 
-    // Untriggered //
-    if (!event_opt) {
+    auto handle = get_handle(dev_name, wav_info.format, wav_info.rate);
+    if (!handle)
+      throw std::runtime_error(fmt::format("Failed to open and configure device '{}'", dev_name));
 
-      fmt::print("Max: {}\n", max_val);
+    auto errc = std::error_code{};
+    if (!std::filesystem::create_directories(dir, errc) && errc)
+      throw std::runtime_error(
+          fmt::format("Failed to create output directory '{}': {}", dir, errc.message()));
 
-      if (max_val > threshold) {
-        auto const trigger_point = std::chrono::high_resolution_clock::now();
-        auto const time = std::time(nullptr);
-        auto const filename =
-            fmt::format("{}/{:%Y-%m-%d_%H-%M-%S}.wav", dir, *std::localtime(&time));
+    // Main Loop //
 
-        fmt::print("Triggered!\n");
+    auto event_opt = std::optional<Event>{std::nullopt};
 
-        event_opt = std::make_pair(trigger_point, WavFile{filename, wav_info});
-      } else
-        event_opt = std::nullopt;
+    while (!sigint_status) {
+      auto const [data, count] = listen<buf_size>(handle).value();
+      auto const rms_val = rms(data.begin(), data.begin() + count);
 
-    } else {
+      // Untriggered //
+      if (!event_opt) {
 
-      auto& [trigger_point, file] = *event_opt;
+        fmt::print("RMS: {}\n", rms_val);
 
-      fmt::print("Triggered state. Filepath: {}, Max val: {}\n", file.path().native(), max_val);
+        if (rms_val > threshold) {
+          auto const trigger_point = std::chrono::high_resolution_clock::now();
+          auto const time = std::time(nullptr);
+          auto const filename =
+              fmt::format("{}/{:%Y-%m-%d_%H-%M-%S}.wav", dir, *std::localtime(&time));
 
-      file.append(data.begin(), count);
+          fmt::print("Triggered!\n");
 
-      auto const now = std::chrono::system_clock::now();
+          event_opt = std::make_pair(trigger_point, WavFile{filename, wav_info});
+        } else
+          event_opt = std::nullopt;
 
-      if (max_val > keepalive)
-        event_opt->first = now;
-      else if (now > trigger_point + 5s)
-        event_opt = std::nullopt;
+        // Triggered //
+      } else {
+
+        auto& [trigger_point, file] = *event_opt;
+
+        fmt::print("Triggered state. Filepath: {}, RMS val: {}\n", file.path().native(), rms_val);
+
+        file.append(data.begin(), count);
+
+        auto const now = std::chrono::system_clock::now();
+
+        if (rms_val > keepalive)
+          event_opt->first = now;
+        else if (now > trigger_point + 5s)
+          event_opt = std::nullopt;
+      }
     }
+
+    snd_pcm_close(handle);
+
+  } catch (std::exception const& e) {
+    fmt::print(stderr, "Failed: {}", e.what());
+    return -1;
   }
 
   fmt::print("\nDone!");
-
-  snd_pcm_close(handle);
 }

@@ -8,8 +8,10 @@
 #include <numeric>
 #include <optional>
 
-using sample_t = std::int16_t;
-using fat_t = std::int64_t;
+using sample = std::int16_t;
+using fat = std::int64_t;
+
+enum class DetectionMethod { RMS, Peak };
 
 auto get_handle(std::string_view device, snd_pcm_format_t format, unsigned int rate) -> snd_pcm_t* {
   int err;
@@ -68,9 +70,9 @@ auto get_handle(std::string_view device, snd_pcm_format_t format, unsigned int r
 
 template <snd_pcm_uframes_t frames>
 auto listen(snd_pcm_t* const handle)
-    -> std::optional<std::pair<std::array<sample_t, frames>, snd_pcm_uframes_t>> {
+    -> std::optional<std::pair<std::array<sample, frames>, snd_pcm_uframes_t>> {
 
-  std::array<sample_t, frames> buf;
+  std::array<sample, frames> buf;
 
   long int err;
   if ((err = snd_pcm_readi(handle, buf.data(), frames)) != frames) {
@@ -86,8 +88,8 @@ template <typename It> auto rms(It&& begin, It&& end) -> float {
   using value_type = typename std::iterator_traits<It>::value_type;
 
   auto constexpr square_add = [](value_type a, value_type b) {
-    auto const a_fat = fat_t{a};
-    auto const b_fat = fat_t{b};
+    auto const a_fat = fat{a};
+    auto const b_fat = fat{b};
 
     return (a_fat * a_fat) + (b_fat * b_fat);
   };

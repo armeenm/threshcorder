@@ -66,14 +66,14 @@ auto main(int const argc, char const* const* const argv) -> int {
 
     while (!sigint_status) {
       auto const [data, count] = listen<buf_size>(handle).value();
-      auto const rms_val = rms(data.begin(), data.begin() + count);
+      auto const max_val = *std::max_element(data.begin(), data.begin() + count);
 
       // Untriggered //
       if (!event_opt) {
 
-        fmt::print("RMS: {}\n", rms_val);
+        fmt::print("Max: {}\n", max_val);
 
-        if (rms_val > threshold) {
+        if (max_val > threshold) {
           auto const trigger_point = std::chrono::high_resolution_clock::now();
           auto const time = std::time(nullptr);
           auto const filename =
@@ -90,13 +90,13 @@ auto main(int const argc, char const* const* const argv) -> int {
 
         auto& [trigger_point, file] = *event_opt;
 
-        fmt::print("Triggered state. Filepath: {}, RMS val: {}\n", file.path().native(), rms_val);
+        fmt::print("Triggered state. Filepath: {}, Max val: {}\n", file.path().native(), max_val);
 
         file.append(data.begin(), count);
 
         auto const now = std::chrono::system_clock::now();
 
-        if (rms_val > keepalive)
+        if (max_val > keepalive)
           event_opt->first = now;
         else if (now > trigger_point + 5s)
           event_opt = std::nullopt;

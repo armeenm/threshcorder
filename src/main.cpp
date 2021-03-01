@@ -1,5 +1,4 @@
 #include "audio.h"
-#include "third_party/magic_enum.hpp"
 #include "wav_file.h"
 
 #include <chrono>
@@ -10,6 +9,7 @@
 #include <fmt/chrono.h>
 #include <fmt/core.h>
 #include <iostream>
+#include <magic_enum.hpp>
 #include <optional>
 #include <utility>
 

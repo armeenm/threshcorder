@@ -9,7 +9,8 @@ project('threshcorder',
     'b_ndebug=if-release',
     'warning_level=3',
     'b_lto=true',
-    'pkg_config_path=' + meson.current_build_dir()]
+    'pkg_config_path=' + meson.current_build_dir()
+  ]
 )
 
 if get_option('use_conan')
@@ -28,7 +29,7 @@ if get_option('use_conan')
     '--build=missing')
 
   if r.returncode() != 0
-    error('Failed to install dependencies with conan')
+    error('Failed to install dependencies with Conan')
   endif
 endif
 

@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
-#include <fmt/format.h>
+#include <fmt/core.h>
 #include <iostream>
 #include <memory>
 #include <type_traits>

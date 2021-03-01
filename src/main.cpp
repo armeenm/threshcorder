@@ -1,6 +1,6 @@
+#include "audio.h"
 #include "third_party/magic_enum.hpp"
-#include "threshcorder/audio.h"
-#include "threshcorder/wav_file.h"
+#include "wav_file.h"
 
 #include <chrono>
 #include <csignal>
@@ -48,6 +48,7 @@ auto main(int const argc, char const* const* const argv) -> int {
       throw std::runtime_error(fmt::format("Unknown detection method '{}'", detection_method_str));
 
     auto const detection_method = detection_method_opt.value();
+    (void)detection_method;
 
     fmt::print("Threshold: {}\n", threshold);
 

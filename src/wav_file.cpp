@@ -1,4 +1,5 @@
-#include "threshcorder/wav_file.h"
+#include "wav_file.h"
+
 #include <iostream>
 
 WavFile::WavFile(std::filesystem::path path, Info info, bool overwrite)

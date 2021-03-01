@@ -15,9 +15,16 @@ project('threshcorder',
 if get_option('use_conan')
   conan = find_program('conan')
 
+  if get_option('buildtype').startswith('release')
+    conan_bt = 'build_type=Release'
+  else
+    conan_bt = 'build_type=Debug'
+  endif
+
   r = run_command(conan,
     'install', '.',
     '-if', meson.current_build_dir(),
+    '-s', conan_bt,
     '--build=missing')
 
   if r.returncode() != 0

@@ -1,2 +1,5 @@
-build*
-compile_commands.json
+/build*
+/compile_commands.json
+/.envrc
+/.direnv
+/result
